@@ -131,7 +131,7 @@ type Device struct {
 type LightState struct {
 	State      string
 	Brightness int
-	ColorTemp  int
+	ColorTemp  int `json:"color_temp"`
 	Color      struct {
 		X float64
 		Y float64
