@@ -60,23 +60,6 @@ var topics = []topicListener{
 			log.Info.Printf("Unmarshal %v", err)
 			return
 		}
-		var ellegibleDevices []*Device
-		for _, z := range zigbeeDevices {
-			// Skip over ourselves
-			if z.Type == Z2MDeviceTypeCoordinator {
-				continue
-			}
-			// Skip over incomplete or unsupported devices
-			if !z.Interviewing && z.InterviewCompleted && z.Supported {
-				d := newDevice(z)
-				if d != nil {
-					ellegibleDevices = append(ellegibleDevices, d)
-				} else {
-					log.Info.Printf("skipping unsupported %v (%v, %v, %v)", z.FriendlyName, z.Definition.Model, z.Definition.Description, z.IeeeAddress)
-				}
-			}
-		}
-		//spew.Dump(ellegibleDevices)
 		if transport != nil {
 			<-transport.Stop()
 			transport = nil
@@ -94,6 +77,23 @@ var topics = []topicListener{
 				}
 			}
 		}
+		var ellegibleDevices []*Device
+		for _, z := range zigbeeDevices {
+			// Skip over ourselves
+			if z.Type == Z2MDeviceTypeCoordinator {
+				continue
+			}
+			// Skip over incomplete or unsupported devices
+			if !z.Interviewing && z.InterviewCompleted && z.Supported {
+				d := newDevice(z)
+				if d != nil {
+					ellegibleDevices = append(ellegibleDevices, d)
+				} else {
+					log.Info.Printf("skipping unsupported %v (%v, %v, %v)", z.FriendlyName, z.Definition.Model, z.Definition.Description, z.IeeeAddress)
+				}
+			}
+		}
+		//spew.Dump(ellegibleDevices)
 		devices = ellegibleDevices
 		accessories := make([]*accessory.Accessory, len(devices))
 		for i, d := range devices {
