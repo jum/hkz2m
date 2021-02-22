@@ -148,7 +148,9 @@ func newDevice(z *Z2MDevice) *Device {
 	id, err := strconv.ParseUint(z.IeeeAddress[2:], 16, 64)
 	if err != nil {
 		log.Info.Printf("cannot parse %v as unt16: %v", z.IeeeAddress, err)
+		return nil
 	}
+	log.Debug.Printf("device %v, ieee %v, id %x", z.FriendlyName, z.IeeeAddress, id)
 	switch f.Type {
 	case "light":
 		log.Debug.Printf("light feature: %#v", f.Features)
@@ -195,16 +197,26 @@ func newDevice(z *Z2MDevice) *Device {
 		a.Lightbulb.Saturation.OnValueRemoteUpdate(func(saturation float64) {
 			log.Debug.Printf("%v saturation: %v", d.FriendlyName, saturation)
 		})
-		token := mqttClient.Subscribe(z2m+"/"+d.FriendlyName, 0, func(client mqtt.Client, message mqtt.Message) {
-			var state LightState
-			err := json.Unmarshal(message.Payload(), &state)
-			if err != nil {
-				log.Info.Printf("Unmarshal %v: %v", string(message.Payload()), err)
-				return
+		token := mqttClient.Subscribe(z2m+"/"+d.FriendlyName+"/#", 0, func(client mqtt.Client, message mqtt.Message) {
+			if message.Topic() == z2m+"/"+d.FriendlyName {
+				var state LightState
+				err := json.Unmarshal(message.Payload(), &state)
+				if err != nil {
+					log.Info.Printf("Unmarshal %v: %v", string(message.Payload()), err)
+					return
+				}
+				log.Debug.Printf("%v got: %#v", d.FriendlyName, state)
+				a.Lightbulb.On.SetValue(state.State == "ON")
+				a.Lightbulb.Brightness.SetValue(state.Brightness)
+			} else if message.Topic() == z2m+"/"+d.FriendlyName+"/availability" {
+				payload := string(message.Payload())
+				switch payload {
+				case "online":
+				case "offline":
+				default:
+					log.Info.Printf("%v: %v", d.FriendlyName, payload)
+				}
 			}
-			log.Debug.Printf("%v got: %#v", d.FriendlyName, state)
-			a.Lightbulb.On.SetValue(state.State == "ON")
-			a.Lightbulb.Brightness.SetValue(state.Brightness)
 		})
 		go func() {
 			token.Wait()

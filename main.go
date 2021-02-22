@@ -60,50 +60,53 @@ var topics = []topicListener{
 			log.Info.Printf("Unmarshal %v", err)
 			return
 		}
+		log.Debug.Printf("new devices")
 		if transport != nil {
 			<-transport.Stop()
 			transport = nil
-		}
-		for _, d := range devices {
-			var topics []string
-			if d.Subscribed {
-				topics = append(topics, z2m+"/"+d.FriendlyName)
-			}
-			if len(topics) > 0 {
-				token := mqttClient.Unsubscribe(topics...)
-				token.Wait()
-				if token.Error() != nil {
-					log.Info.Printf("Unsubscribe: %v", token.Error())
-				}
-			}
-		}
-		var ellegibleDevices []*Device
-		for _, z := range zigbeeDevices {
-			// Skip over ourselves
-			if z.Type == Z2MDeviceTypeCoordinator {
-				continue
-			}
-			// Skip over incomplete or unsupported devices
-			if !z.Interviewing && z.InterviewCompleted && z.Supported {
-				d := newDevice(z)
-				if d != nil {
-					ellegibleDevices = append(ellegibleDevices, d)
-				} else {
-					log.Info.Printf("skipping unsupported %v (%v, %v, %v)", z.FriendlyName, z.Definition.Model, z.Definition.Description, z.IeeeAddress)
-				}
-			}
-		}
-		//spew.Dump(ellegibleDevices)
-		devices = ellegibleDevices
-		accessories := make([]*accessory.Accessory, len(devices))
-		for i, d := range devices {
-			accessories[i] = d.Accessory
-		}
-		transport, err = hc.NewIPTransport(hc.Config{Pin: pin, StoragePath: "./.db"}, bridgeAccessory.Accessory, accessories...)
-		if err != nil {
-			log.Info.Printf("NewIPTransport: %s", err)
+			log.Debug.Printf("transport stopped")
 		}
 		go func() {
+			for _, d := range devices {
+				var topics []string
+				if d.Subscribed {
+					topics = append(topics, z2m+"/"+d.FriendlyName+"/#")
+				}
+				if len(topics) > 0 {
+					token := mqttClient.Unsubscribe(topics...)
+					token.Wait()
+					if token.Error() != nil {
+						log.Info.Printf("Unsubscribe: %v", token.Error())
+					}
+				}
+				log.Debug.Printf("unsubscribed topics")
+			}
+			var elegibleDevices []*Device
+			for _, z := range zigbeeDevices {
+				// Skip over ourselves
+				if z.Type == Z2MDeviceTypeCoordinator {
+					continue
+				}
+				// Skip over incomplete or unsupported devices
+				if !z.Interviewing && z.InterviewCompleted && z.Supported {
+					d := newDevice(z)
+					if d != nil {
+						elegibleDevices = append(elegibleDevices, d)
+					} else {
+						log.Info.Printf("skipping unsupported %v (%v, %v, %v)", z.FriendlyName, z.Definition.Model, z.Definition.Description, z.IeeeAddress)
+					}
+				}
+			}
+			//spew.Dump(elegibleDevices)
+			devices = elegibleDevices
+			accessories := make([]*accessory.Accessory, len(devices))
+			for i, d := range devices {
+				accessories[i] = d.Accessory
+			}
+			transport, err = hc.NewIPTransport(hc.Config{Pin: pin, StoragePath: "./.db"}, bridgeAccessory.Accessory, accessories...)
+			if err != nil {
+				log.Info.Fatalf("NewIPTransport: %s", err)
+			}
 			transport.Start()
 		}()
 	}},
